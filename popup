@@ -1,0 +1,156 @@
+from PyQt5.QtWidgets import QMessageBox
+
+def show_info_message(self, title, message):
+    msg = QMessageBox()
+    msg.setIcon(QMessageBox.Information)
+    msg.setWindowTitle(title)
+    msg.setText(message)
+    msg.setStandardButtons(QMessageBox.Ok)
+    msg.exec_()
+
+def show_warning_message(self, title, message):
+    msg = QMessageBox()
+    msg.setIcon(QMessageBox.Warning)
+    msg.setWindowTitle(title)
+    msg.setText(message)
+    msg.setStandardButtons(QMessageBox.Ok)
+    msg.exec_()
+
+def show_error_message(self, title, message):
+    msg = QMessageBox()
+    msg.setIcon(QMessageBox.Critical)
+    msg.setWindowTitle(title)
+    msg.setText(message)
+    msg.setStandardButtons(QMessageBox.Ok)
+    msg.exec_()
+
+def show_question_message(self, title, message):
+    msg = QMessageBox()
+    msg.setIcon(QMessageBox.Question)
+    msg.setWindowTitle(title)
+    msg.setText(message)
+    msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+    return msg.exec_()
+
+
+self.show_info_message("Information", "This is an information message.")
+self.show_warning_message("Warning", "This is a warning message.")
+self.show_error_message("Error", "This is an error message.")
+if self.show_question_message("Question", "Do you want to proceed?") == QMessageBox.Yes:
+    print("User chose Yes")
+else:
+    print("User chose No")
+
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout
+
+class CustomDialog(QDialog):
+    def __init__(self, parent=None):
+        super(CustomDialog, self).__init__(parent)
+        
+        self.setWindowTitle("Custom Dialog")
+        
+        layout = QVBoxLayout()
+        
+        self.label = QLabel("Enter data:")
+        layout.addWidget(self.label)
+        
+        self.input_field = QLineEdit()
+        layout.addWidget(self.input_field)
+        
+        button_layout = QHBoxLayout()
+        
+        self.ok_button = QPushButton("OK")
+        self.ok_button.clicked.connect(self.accept)
+        button_layout.addWidget(self.ok_button)
+        
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(self.cancel_button)
+        
+        layout.addLayout(button_layout)
+        
+        self.setLayout(layout)
+        
+    def get_input(self):
+        return self.input_field.text()
+
+def show_custom_dialog(self):
+    dialog = CustomDialog(self)
+    if dialog.exec_() == QDialog.Accepted:
+        input_data = dialog.get_input()
+        print(f"Input data: {input_data}")
+
+self.show_custom_dialog()
+
+
+class UIExecute(QtWidgets.QMainWindow, Ui_MainWindow):
+    def __init__(self):
+        super(UIExecute, self).__init__()
+        self.setupUi(self)
+        self.setWindowTitle(window_title)
+        self.showMaximized()
+
+        # Add buttons for inserting data
+        self.btn_add_data = QtWidgets.QPushButton("Add Data", self)
+        self.btn_add_data.setGeometry(QtCore.QRect(100, 600, 100, 30))
+        self.btn_add_data.clicked.connect(self.add_data_to_db)
+
+        self.btn_refresh = QtWidgets.QPushButton("Refresh", self)
+        self.btn_refresh.setGeometry(QtCore.QRect(220, 600, 100, 30))
+        self.btn_refresh.clicked.connect(self.load_data)
+
+        # Other initializations...
+
+        self.load_data()
+
+    def show_info_message(self, title, message):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setWindowTitle(title)
+        msg.setText(message)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.exec_()
+
+    def show_warning_message(self, title, message):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setWindowTitle(title)
+        msg.setText(message)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.exec_()
+
+    def show_error_message(self, title, message):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Critical)
+        msg.setWindowTitle(title)
+        msg.setText(message)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.exec_()
+
+    def show_question_message(self, title, message):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Question)
+        msg.setWindowTitle(title)
+        msg.setText(message)
+        msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        return msg.exec_()
+
+    def add_data_to_db(self):
+        reference = 'sensor_1'
+        value = '123'  # Replace this with actual sensor data
+        result = 'PASS'  # Replace this with the actual result
+        ConnectToMySQL().insert_data(reference, value, result)
+        self.show_info_message('Info', 'Data added successfully!')
+        self.load_data()
+
+    def show_custom_dialog(self):
+        dialog = CustomDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            input_data = dialog.get_input()
+            print(f"Input data: {input_data}")
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    myApp = UIExecute()
+    myApp.show()
+    sys.exit(app.exec_())

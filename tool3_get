@@ -15,10 +15,13 @@ class SerialPortTool(QMainWindow):
         # Load settings
         self.loadSettings()
 
-        # Setup timer to refresh COM ports
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.populateCOMPorts)
-        self.timer.start(2000)  # Check every 2 seconds
+        # Start timer to refresh COM ports every 5 seconds
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.checkForCOMPortChanges)
+        self.timer.start(5000)
+
+        # Store initial COM ports for change detection
+        self.previous_ports = self.getAvailableCOMPorts()
 
     def initUI(self):
         self.setWindowTitle('Serial Port Tool')
@@ -48,18 +51,21 @@ class SerialPortTool(QMainWindow):
         self.refreshButton.clicked.connect(self.populateCOMPorts)
         self.layout.addWidget(self.refreshButton)
 
+    def getAvailableCOMPorts(self):
+        return [port.device for port in serial.tools.list_ports.comports()]
+
     def populateCOMPorts(self):
-        ports = serial.tools.list_ports.comports()
-        current_ports = [self.portComboBox.itemText(i) for i in range(self.portComboBox.count())]
-        available_ports = [port.device for port in ports]
+        ports = self.getAvailableCOMPorts()
+        self.portComboBox.clear()
+        for port in ports:
+            self.portComboBox.addItem(port)
+        self.loadSettings()
 
-        if set(current_ports) != set(available_ports):
-            self.portComboBox.clear()
-            for port in available_ports:
-                self.portComboBox.addItem(port)
-
-            # Reload settings to reselect the previously selected COM port if still available
-            self.loadSettings()
+    def checkForCOMPortChanges(self):
+        current_ports = self.getAvailableCOMPorts()
+        if set(current_ports) != set(self.previous_ports):
+            self.populateCOMPorts()
+            self.previous_ports = current_ports
 
     def connectSerialPort(self):
         com_port = self.portComboBox.currentText()

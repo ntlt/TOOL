@@ -1,0 +1,35 @@
+def loadSettings(self):
+    settings = QSettings('MyCompany', 'SerialPortTool')
+    com_port = settings.value('com_port', '')
+    baud_rate = settings.value('baud_rate', '9600')
+
+    # Set the COM port and baud rate in the UI
+    index = self.portComboBox.findText(com_port)
+    if index != -1:
+        self.portComboBox.setCurrentIndex(index)
+
+    index = self.baudRateComboBox.findText(baud_rate)
+    if index != -1:
+        self.baudRateComboBox.setCurrentIndex(index)
+
+
+
+def saveSettings(self, com_port, baud_rate):
+    settings = QSettings('MyCompany', 'SerialPortTool')
+    settings.setValue('com_port', com_port)
+    settings.setValue('baud_rate', baud_rate)
+
+
+def __init__(self):
+    super().__init__()
+
+    self.initUI()
+
+    # Populate COM ports
+    self.populateCOMPorts()
+
+    # Load settings to set initial values
+    self.loadSettings()
+
+
+

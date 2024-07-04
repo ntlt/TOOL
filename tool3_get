@@ -43,14 +43,6 @@ class SerialPortTool(QMainWindow):
         self.baudRateComboBox.addItems(['9600', '19200', '38400', '57600', '115200'])
         self.layout.addWidget(self.baudRateComboBox)
 
-        self.connectButton = QPushButton('Connect')
-        self.connectButton.clicked.connect(self.connectSerialPort)
-        self.layout.addWidget(self.connectButton)
-
-        self.refreshButton = QPushButton('Refresh COM Ports')
-        self.refreshButton.clicked.connect(self.populateCOMPorts)
-        self.layout.addWidget(self.refreshButton)
-
     def getAvailableCOMPorts(self):
         return [port.device for port in serial.tools.list_ports.comports()]
 
@@ -59,24 +51,12 @@ class SerialPortTool(QMainWindow):
         self.portComboBox.clear()
         for port in ports:
             self.portComboBox.addItem(port)
-        self.loadSettings()
 
     def checkForCOMPortChanges(self):
         current_ports = self.getAvailableCOMPorts()
         if set(current_ports) != set(self.previous_ports):
             self.populateCOMPorts()
             self.previous_ports = current_ports
-
-    def connectSerialPort(self):
-        com_port = self.portComboBox.currentText()
-        baud_rate = self.baudRateComboBox.currentText()
-
-        # Here you can add code to actually connect to the serial port using pyserial
-        # Example:
-        # ser = serial.Serial(com_port, baud_rate)
-
-        # Save settings
-        self.saveSettings(com_port, baud_rate)
 
     def loadSettings(self):
         settings = QSettings('MyCompany', 'SerialPortTool')
@@ -100,6 +80,13 @@ class SerialPortTool(QMainWindow):
         settings = QSettings('MyCompany', 'SerialPortTool')
         settings.setValue('com_port', com_port)
         settings.setValue('baud_rate', baud_rate)
+
+    def closeEvent(self, event):
+        # Save settings when closing the application
+        com_port = self.portComboBox.currentText()
+        baud_rate = self.baudRateComboBox.currentText()
+        self.saveSettings(com_port, baud_rate)
+        event.accept()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

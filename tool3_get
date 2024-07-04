@@ -1,95 +1,741 @@
-import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QComboBox, QPushButton
-from PyQt5.QtCore import QSettings, QTimer
-import serial.tools.list_ports
+khi chọn xong nó sẽ về giao diện chính và các giá trị của model tương ứng từng testcase đã dược lưu lại. và tôi có một máy scan mã qr nó sẽ ra thông tin model và giao diện chính sẽ tự đông cập nhật test case tương ứng từng model
+ChatGPT
+Để thực hiện tính năng khi chọn xong sản phẩm trên ProductDialog, giao diện chính sẽ cập nhật các giá trị tương ứng và tự động cập nhật thông tin từ máy scan mã QR, bạn có thể làm như sau:
 
-class SerialPortTool(QMainWindow):
+Giao diện chính và ProductDialog: Cập nhật giao diện chính để nhận dữ liệu từ ProductDialog khi người dùng chọn xong một sản phẩm.
+
+Kết nối tới máy scan mã QR: Xử lý dữ liệu từ máy scan và cập nhật tự động vào giao diện chính.
+
+Dưới đây là cách bạn có thể cập nhật ví dụ trước để thực hiện tính năng này:
+
+python
+Copy code
+from PyQt5.QtWidgets import QDialog, QListWidget, QVBoxLayout, QListWidgetItem, QApplication, QPushButton, QWidget, QLabel, QHBoxLayout, QLineEdit
+from PyQt5.QtCore import pyqtSignal, QObject
+
+
+class ProductDialog(QDialog):
+    product_selected = pyqtSignal(str, int)
+
+    def __init__(self, products_data, parent=None):
+        super(ProductDialog, self).__init__(parent)
+
+        self.products_data = products_data
+
+        self.setWindowTitle("Select Product Model")
+
+        layout = QVBoxLayout(self)
+
+        self.list_widget = QListWidget()
+        self.list_widget.itemClicked.connect(self.on_item_clicked)
+
+        self.update_list_widget()
+
+        layout.addWidget(self.list_widget)
+
+    def update_list_widget(self):
+        self.list_widget.clear()
+        for product, test_cases in self.products_data.items():
+            item = QListWidgetItem(f"{product}: {test_cases} test cases")
+            self.list_widget.addItem(item)
+
+    def on_item_clicked(self, item):
+        # Example: Get selected item text
+        selected_text = item.text()
+        product_name, test_cases_str = selected_text.split(':')
+        test_cases = int(test_cases_str.split()[0])
+        self.product_selected.emit(product_name, test_cases)
+
+
+class MainWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.initUI()
+        self.products_data = {
+            "Model A": 10,
+            "Model B": 15,
+            "Model C": 20
+        }
 
-        # Populate COM ports
-        self.populateCOMPorts()
+        self.init_ui()
 
-        # Load settings
-        self.loadSettings()
+    def init_ui(self):
+        self.setWindowTitle("Product Management")
+        layout = QVBoxLayout(self)
 
-        # Start timer to refresh COM ports every 5 seconds
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.checkForCOMPortChanges)
-        self.timer.start(5000)
+        self.product_dialog = ProductDialog(self.products_data)
+        self.product_dialog.product_selected.connect(self.on_product_selected)
 
-        # Store initial COM ports for change detection
-        self.previous_ports = self.getAvailableCOMPorts()
+        self.add_product_label = QLabel("Add New Product:")
+        self.product_name_edit = QLineEdit()
+        self.product_name_edit.setPlaceholderText("Enter product name")
+        self.test_cases_edit = QLineEdit()
+        self.test_cases_edit.setPlaceholderText("Enter number of test cases")
+        self.add_product_button = QPushButton("Add Product")
+        self.add_product_button.clicked.connect(self.add_product_clicked)
 
-    def initUI(self):
-        self.setWindowTitle('Serial Port Tool')
+        layout.addWidget(self.add_product_label)
+        layout.addWidget(self.product_name_edit)
+        layout.addWidget(self.test_cases_edit)
+        layout.addWidget(self.add_product_button)
 
-        self.centralWidget = QWidget()
-        self.setCentralWidget(self.centralWidget)
-        self.layout = QVBoxLayout(self.centralWidget)
+        layout.addWidget(self.product_dialog)
 
-        self.portLabel = QLabel('Select COM Port:')
-        self.layout.addWidget(self.portLabel)
+    def add_product_clicked(self):
+        product_name = self.product_name_edit.text()
+        test_cases_str = self.test_cases_edit.text()
 
-        self.portComboBox = QComboBox()
-        self.layout.addWidget(self.portComboBox)
-
-        self.baudRateLabel = QLabel('Select Baud Rate:')
-        self.layout.addWidget(self.baudRateLabel)
-
-        self.baudRateComboBox = QComboBox()
-        self.baudRateComboBox.addItems(['9600', '19200', '38400', '57600', '115200'])
-        self.layout.addWidget(self.baudRateComboBox)
-
-    def getAvailableCOMPorts(self):
-        return [port.device for port in serial.tools.list_ports.comports()]
-
-    def populateCOMPorts(self):
-        ports = self.getAvailableCOMPorts()
-        self.portComboBox.clear()
-        for port in ports:
-            self.portComboBox.addItem(port)
-
-    def checkForCOMPortChanges(self):
-        current_ports = self.getAvailableCOMPorts()
-        if set(current_ports) != set(self.previous_ports):
-            self.populateCOMPorts()
-            self.previous_ports = current_ports
-
-    def loadSettings(self):
-        settings = QSettings('MyCompany', 'SerialPortTool')
-        com_port = settings.value('com_port', '')
-        baud_rate = settings.value('baud_rate', '9600')
-
-        # Check if the saved com_port is in the current list of ports
-        index = self.portComboBox.findText(com_port)
-        if index != -1:
-            self.portComboBox.setCurrentIndex(index)
+        if product_name and test_cases_str:
+            try:
+                test_cases = int(test_cases_str)
+                self.product_dialog.add_product(product_name, test_cases)
+                self.product_name_edit.clear()
+                self.test_cases_edit.clear()
+            except ValueError:
+                print("Invalid number of test cases entered.")
         else:
-            # If not found, select the first available port or leave empty if no ports are available
-            if self.portComboBox.count() > 0:
-                self.portComboBox.setCurrentIndex(0)
+            print("Please enter both product name and number of test cases.")
 
-        index = self.baudRateComboBox.findText(baud_rate)
-        if index != -1:
-            self.baudRateComboBox.setCurrentIndex(index)
+    def on_product_selected(self, product_name, test_cases):
+        # Example: Update UI with selected product and test cases
+        print(f"Selected Product: {product_name}, Test Cases: {test_cases}")
+        # Here you would update your main UI with the selected product and test cases
 
-    def saveSettings(self, com_port, baud_rate):
-        settings = QSettings('MyCompany', 'SerialPortTool')
-        settings.setValue('com_port', com_port)
-        settings.setValue('baud_rate', baud_rate)
-
-    def closeEvent(self, event):
-        # Save settings when closing the application
-        com_port = self.portComboBox.currentText()
-        baud_rate = self.baudRateComboBox.currentText()
-        self.saveSettings(com_port, baud_rate)
-        event.accept()
 
 if __name__ == '__main__':
+    import sys
+
     app = QApplication(sys.argv)
-    window = SerialPortTool()
-    window.show()
+
+    main_widget = MainWidget()
+    main_widget.show()
+
     sys.exit(app.exec_())
+Trong ví dụ này:
+
+ProductDialog phát ra tín hiệu product_selected khi người dùng chọn một sản phẩm từ danh sách. Tín hiệu này mang thông tin về tên sản phẩm và số lượng test cases.
+MainWidget kết nối tới tín hiệu product_selected từ ProductDialog và cập nhật giao diện chính khi có sản phẩm được chọn.
+Khi máy scan mã QR cung cấp thông tin về model và số lượng test case, bạn có thể sử dụng logic xử lý tương tự để tự động cập nhật dữ liệu trên giao diện chính.
+Bạn có thể điều chỉnh và mở rộng logic xử lý tùy theo yêu cầu cụ thể của ứng dụng của mình, ví dụ như lưu trữ thông tin, hiển thị thông báo, hoặc thay đổi giao diện hiển thị sản phẩm và số lượng test case.
+
+            "Model A": 10,
+            "Model B": 15,
+            "Model C": 20 nó khộng phãi là giá trị defaut mà nó sẽ dc cập nhật sau khi tôi lựa chọn ban đầu model gì với bao nhiêu testcase
+ChatGPT
+Để cập nhật giá trị của các model và số lượng test case sau khi người dùng đã lựa chọn, bạn có thể thay đổi cách lưu trữ và cập nhật dữ liệu trong ứng dụng của bạn. Thay vì sử dụng giá trị mặc định cứng nhắc, bạn có thể sử dụng một cơ chế để lưu trữ và cập nhật dữ liệu động khi có thay đổi từ người dùng. Dưới đây là cách bạn có thể thực hiện điều này:
+
+Cơ chế lưu trữ dữ liệu: Sử dụng một dictionary hoặc một cấu trúc dữ liệu khác để lưu trữ các model và số lượng test case hiện tại.
+
+Cập nhật dữ liệu: Khi người dùng chọn một model từ ProductDialog hoặc khi nhận được dữ liệu từ máy scan mã QR, bạn cập nhật dữ liệu của model tương ứng trong cấu trúc lưu trữ này.
+
+Dưới đây là một ví dụ minh họa để bạn tham khảo:
+
+python
+Copy code
+from PyQt5.QtWidgets import QDialog, QListWidget, QVBoxLayout, QListWidgetItem, QApplication, QPushButton, QWidget, QLabel, QHBoxLayout, QLineEdit
+from PyQt5.QtCore import pyqtSignal, QObject
+
+
+class ProductDialog(QDialog):
+    product_selected = pyqtSignal(str, int)
+
+    def __init__(self, products_data, parent=None):
+        super(ProductDialog, self).__init__(parent)
+
+        self.products_data = products_data
+
+        self.setWindowTitle("Select Product Model")
+
+        layout = QVBoxLayout(self)
+
+        self.list_widget = QListWidget()
+        self.list_widget.itemClicked.connect(self.on_item_clicked)
+
+        self.update_list_widget()
+
+        layout.addWidget(self.list_widget)
+
+    def update_list_widget(self):
+        self.list_widget.clear()
+        for product, test_cases in self.products_data.items():
+            item = QListWidgetItem(f"{product}: {test_cases} test cases")
+            self.list_widget.addItem(item)
+
+    def on_item_clicked(self, item):
+        # Example: Get selected item text
+        selected_text = item.text()
+        product_name, test_cases_str = selected_text.split(':')
+        test_cases = int(test_cases_str.split()[0])
+        self.product_selected.emit(product_name, test_cases)
+
+
+class MainWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.products_data = {}  # Initialize with an empty dictionary
+
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("Product Management")
+        layout = QVBoxLayout(self)
+
+        self.product_dialog = ProductDialog(self.products_data)
+        self.product_dialog.product_selected.connect(self.on_product_selected)
+
+        self.add_product_label = QLabel("Add New Product:")
+        self.product_name_edit = QLineEdit()
+        self.product_name_edit.setPlaceholderText("Enter product name")
+        self.test_cases_edit = QLineEdit()
+        self.test_cases_edit.setPlaceholderText("Enter number of test cases")
+        self.add_product_button = QPushButton("Add Product")
+        self.add_product_button.clicked.connect(self.add_product_clicked)
+
+        layout.addWidget(self.add_product_label)
+        layout.addWidget(self.product_name_edit)
+        layout.addWidget(self.test_cases_edit)
+        layout.addWidget(self.add_product_button)
+
+        layout.addWidget(self.product_dialog)
+
+    def add_product_clicked(self):
+        product_name = self.product_name_edit.text()
+        test_cases_str = self.test_cases_edit.text()
+
+        if product_name and test_cases_str:
+            try:
+                test_cases = int(test_cases_str)
+                self.products_data[product_name] = test_cases  # Update products_data dictionary
+                self.product_dialog.update_list_widget()  # Update ProductDialog with new data
+                self.product_name_edit.clear()
+                self.test_cases_edit.clear()
+            except ValueError:
+                print("Invalid number of test cases entered.")
+        else:
+            print("Please enter both product name and number of test cases.")
+
+    def on_product_selected(self, product_name, test_cases):
+        # Example: Update UI with selected product and test cases
+        print(f"Selected Product: {product_name}, Test Cases: {test_cases}")
+        # Here you would update your main UI with the selected product and test cases
+        # For demonstration purposes, let's print the selected product and test cases
+
+
+if __name__ == '__main__':
+    import sys
+
+    app = QApplication(sys.argv)
+
+    main_widget = MainWidget()
+    main_widget.show()
+
+    sys.exit(app.exec_())
+Giải thích ví dụ:
+MainWidget và ProductDialog được cập nhật để sử dụng một dictionary products_data để lưu trữ các model và số lượng test case.
+Khi người dùng thêm một sản phẩm mới vào MainWidget, dữ liệu được cập nhật vào products_data và ProductDialog sẽ được cập nhật lại danh sách các sản phẩm.
+Khi người dùng chọn một sản phẩm từ ProductDialog, thông tin sản phẩm và số lượng test case được truyền lại MainWidget để xử lý hoặc hiển thị.
+Bạn có thể tích hợp logic xử lý từ máy scan mã QR vào trong MainWidget để tự động cập nhật dữ liệu tương ứng. Điều này sẽ cần sự tích hợp và xử lý thêm tùy vào cách máy scan mã QR cung cấp dữ liệu.
+
+hãy tích hợp logic xử lý từ máy scan mã QR vào trong MainWidget để tự động cập nhật dữ liệu tương ứng. ví dụ mã qr đó tôi scan được 12A nó sẽ dựa vào chữ cuối là A cho model A tương ứng testcase đã chọn ban đầu. mỗi lần scan tùy vào model mà giao diện sẽ reload hiển thị testcase theo model. ví dụ model A sẽ có 2 test case ăn ngủ còn model B có 3 testcase ăn ỉa ngủ 
+ChatGPT
+Để tích hợp logic xử lý từ máy scan mã QR vào MainWidget để tự động cập nhật dữ liệu tương ứng theo model, bạn cần thực hiện các bước sau:
+
+Xử lý dữ liệu từ máy scan mã QR: Bạn cần xác định và phân tích dữ liệu từ mã QR để lấy thông tin về model (chữ cái cuối cùng của chuỗi, ví dụ: "12A" thì model là "A").
+
+Cập nhật dữ liệu và giao diện: Dựa vào model từ mã QR, bạn cập nhật số lượng test case tương ứng cho model đó và cập nhật lại giao diện để hiển thị thông tin mới.
+
+Dưới đây là cách bạn có thể mở rộng ví dụ trước để tích hợp tính năng này:
+
+python
+Copy code
+from PyQt5.QtWidgets import QDialog, QListWidget, QVBoxLayout, QListWidgetItem, QApplication, QPushButton, QWidget, QLabel, QHBoxLayout, QLineEdit
+from PyQt5.QtCore import pyqtSignal, QObject
+
+
+class ProductDialog(QDialog):
+    product_selected = pyqtSignal(str, int)
+
+    def __init__(self, products_data, parent=None):
+        super(ProductDialog, self).__init__(parent)
+
+        self.products_data = products_data
+
+        self.setWindowTitle("Select Product Model")
+
+        layout = QVBoxLayout(self)
+
+        self.list_widget = QListWidget()
+        self.list_widget.itemClicked.connect(self.on_item_clicked)
+
+        self.update_list_widget()
+
+        layout.addWidget(self.list_widget)
+
+    def update_list_widget(self):
+        self.list_widget.clear()
+        for product, test_cases in self.products_data.items():
+            item = QListWidgetItem(f"{product}: {test_cases} test cases")
+            self.list_widget.addItem(item)
+
+    def on_item_clicked(self, item):
+        # Example: Get selected item text
+        selected_text = item.text()
+        product_name, test_cases_str = selected_text.split(':')
+        test_cases = int(test_cases_str.split()[0])
+        self.product_selected.emit(product_name, test_cases)
+
+
+class MainWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.products_data = {}  # Initialize with an empty dictionary
+
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("Product Management")
+        layout = QVBoxLayout(self)
+
+        self.product_dialog = ProductDialog(self.products_data)
+        self.product_dialog.product_selected.connect(self.on_product_selected)
+
+        self.add_product_label = QLabel("Add New Product:")
+        self.product_name_edit = QLineEdit()
+        self.product_name_edit.setPlaceholderText("Enter product name")
+        self.test_cases_edit = QLineEdit()
+        self.test_cases_edit.setPlaceholderText("Enter number of test cases")
+        self.add_product_button = QPushButton("Add Product")
+        self.add_product_button.clicked.connect(self.add_product_clicked)
+
+        layout.addWidget(self.add_product_label)
+        layout.addWidget(self.product_name_edit)
+        layout.addWidget(self.test_cases_edit)
+        layout.addWidget(self.add_product_button)
+
+        layout.addWidget(self.product_dialog)
+
+    def add_product_clicked(self):
+        product_name = self.product_name_edit.text()
+        test_cases_str = self.test_cases_edit.text()
+
+        if product_name and test_cases_str:
+            try:
+                test_cases = int(test_cases_str)
+                self.products_data[product_name] = test_cases  # Update products_data dictionary
+                self.product_dialog.update_list_widget()  # Update ProductDialog with new data
+                self.product_name_edit.clear()
+                self.test_cases_edit.clear()
+            except ValueError:
+                print("Invalid number of test cases entered.")
+        else:
+            print("Please enter both product name and number of test cases.")
+
+    def on_product_selected(self, product_name, test_cases):
+        # Example: Update UI with selected product and test cases
+        print(f"Selected Product: {product_name}, Test Cases: {test_cases}")
+        # Here you would update your main UI with the selected product and test cases
+        # For demonstration purposes, let's print the selected product and test cases
+
+    def update_test_cases_from_qr(self, qr_data):
+        # Example: Handle QR data to update test cases based on model
+        if qr_data.endswith('A'):
+            self.products_data["Model A"] = 2  # Update test cases for Model A
+        elif qr_data.endswith('B'):
+            self.products_data["Model B"] = 3  # Update test cases for Model B
+        # Add more conditions as per your QR data format and models
+
+        # Update UI after updating products_data
+        self.product_dialog.update_list_widget()
+
+
+if __name__ == '__main__':
+    import sys
+
+    app = QApplication(sys.argv)
+
+    main_widget = MainWidget()
+    main_widget.show()
+
+    # Simulating QR scan data
+    qr_data = "12A"  # Example QR data, assuming "A" corresponds to Model A
+    main_widget.update_test_cases_from_qr(qr_data)
+
+    sys.exit(app.exec_())
+Giải thích ví dụ:
+MainWidget có phương thức update_test_cases_from_qr để xử lý dữ liệu từ máy scan mã QR và cập nhật số lượng test case tương ứng cho model được xác định từ mã QR.
+Phương thức update_test_cases_from_qr kiểm tra kết thúc của chuỗi mã QR (qr_data) để xác định model tương ứng và cập nhật products_data.
+Sau khi cập nhật products_data, gọi update_list_widget() của ProductDialog để cập nhật lại giao diện hiển thị.
+Bạn có thể mở rộng và điều chỉnh logic xử lý từ mã QR dựa trên yêu cầu cụ thể của ứng dụng của bạn, ví dụ như thêm các điều kiện xử lý cho các model khác, hoặc thêm các tính năng xử lý khác tùy thuộc vào nhu cầu sử dụng.
+
+sau mỗi lần test nó giá trị từng model và giá trị từng testcase sẽ được lưu lại
+ChatGPT
+Để lưu lại giá trị từng model và số lượng test case sau mỗi lần test, bạn có thể sử dụng một cơ chế lưu trữ dữ liệu như một cơ sở dữ liệu nhỏ (ví dụ: SQLite) hoặc lưu trữ dưới dạng file. Trong ví dụ này, chúng ta sẽ sử dụng cách đơn giản là lưu trữ dữ liệu vào một dictionary và cập nhật sau mỗi lần test.
+
+Dưới đây là cách bạn có thể điều chỉnh ví dụ để thực hiện tính năng này:
+
+python
+Copy code
+from PyQt5.QtWidgets import QDialog, QListWidget, QVBoxLayout, QListWidgetItem, QApplication, QPushButton, QWidget, QLabel, QHBoxLayout, QLineEdit
+from PyQt5.QtCore import pyqtSignal, QObject
+import json
+
+
+class ProductDialog(QDialog):
+    product_selected = pyqtSignal(str, int)
+
+    def __init__(self, products_data, parent=None):
+        super(ProductDialog, self).__init__(parent)
+
+        self.products_data = products_data
+
+        self.setWindowTitle("Select Product Model")
+
+        layout = QVBoxLayout(self)
+
+        self.list_widget = QListWidget()
+        self.list_widget.itemClicked.connect(self.on_item_clicked)
+
+        self.update_list_widget()
+
+        layout.addWidget(self.list_widget)
+
+    def update_list_widget(self):
+        self.list_widget.clear()
+        for product, test_cases in self.products_data.items():
+            item = QListWidgetItem(f"{product}: {test_cases} test cases")
+            self.list_widget.addItem(item)
+
+    def on_item_clicked(self, item):
+        # Example: Get selected item text
+        selected_text = item.text()
+        product_name, test_cases_str = selected_text.split(':')
+        test_cases = int(test_cases_str.split()[0])
+        self.product_selected.emit(product_name, test_cases)
+
+
+class MainWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.products_data = {}  # Initialize with an empty dictionary
+        self.load_saved_data()  # Load saved data if available
+
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("Product Management")
+        layout = QVBoxLayout(self)
+
+        self.product_dialog = ProductDialog(self.products_data)
+        self.product_dialog.product_selected.connect(self.on_product_selected)
+
+        self.add_product_label = QLabel("Add New Product:")
+        self.product_name_edit = QLineEdit()
+        self.product_name_edit.setPlaceholderText("Enter product name")
+        self.test_cases_edit = QLineEdit()
+        self.test_cases_edit.setPlaceholderText("Enter number of test cases")
+        self.add_product_button = QPushButton("Add Product")
+        self.add_product_button.clicked.connect(self.add_product_clicked)
+
+        layout.addWidget(self.add_product_label)
+        layout.addWidget(self.product_name_edit)
+        layout.addWidget(self.test_cases_edit)
+        layout.addWidget(self.add_product_button)
+
+        layout.addWidget(self.product_dialog)
+
+    def add_product_clicked(self):
+        product_name = self.product_name_edit.text()
+        test_cases_str = self.test_cases_edit.text()
+
+        if product_name and test_cases_str:
+            try:
+                test_cases = int(test_cases_str)
+                self.products_data[product_name] = test_cases  # Update products_data dictionary
+                self.product_dialog.update_list_widget()  # Update ProductDialog with new data
+                self.product_name_edit.clear()
+                self.test_cases_edit.clear()
+                self.save_data()  # Save updated data after adding product
+            except ValueError:
+                print("Invalid number of test cases entered.")
+        else:
+            print("Please enter both product name and number of test cases.")
+
+    def on_product_selected(self, product_name, test_cases):
+        # Example: Update UI with selected product and test cases
+        print(f"Selected Product: {product_name}, Test Cases: {test_cases}")
+        # Here you would update your main UI with the selected product and test cases
+        # For demonstration purposes, let's print the selected product and test cases
+
+    def update_test_cases_from_qr(self, qr_data):
+        # Example: Handle QR data to update test cases based on model
+        if qr_data.endswith('A'):
+            self.products_data["Model A"] = 2  # Update test cases for Model A
+        elif qr_data.endswith('B'):
+            self.products_data["Model B"] = 3  # Update test cases for Model B
+        # Add more conditions as per your QR data format and models
+
+        # Update UI after updating products_data
+        self.product_dialog.update_list_widget()
+        self.save_data()  # Save updated data after QR scan
+
+    def save_data(self):
+        with open('products_data.json', 'w') as f:
+            json.dump(self.products_data, f)
+
+    def load_saved_data(self):
+        try:
+            with open('products_data.json', 'r') as f:
+                self.products_data = json.load(f)
+        except FileNotFoundError:
+            print("No saved data found.")
+
+    def closeEvent(self, event):
+        self.save_data()  # Save data when closing the application
+
+
+if __name__ == '__main__':
+    import sys
+
+    app = QApplication(sys.argv)
+
+    main_widget = MainWidget()
+    main_widget.show()
+
+    # Simulating QR scan data
+    qr_data = "12A"  # Example QR data, assuming "A" corresponds to Model A
+    main_widget.update_test_cases_from_qr(qr_data)
+
+    sys.exit(app.exec_())
+Giải thích ví dụ:
+MainWidget sử dụng phương thức save_data và load_saved_data để lưu trữ và tải dữ liệu từ file products_data.json. Dữ liệu này sẽ được lưu lại sau mỗi lần thêm sản phẩm mới hoặc cập nhật từ mã QR.
+Khi thêm sản phẩm mới (add_product_clicked) hoặc cập nhật từ mã QR (update_test_cases_from_qr), products_data sẽ được cập nhật và lưu lại vào file products_data.json.
+Phương thức closeEvent được sử dụng để đảm bảo dữ liệu được lưu lại khi ứng dụng đóng lại.
+Bạn có thể điều chỉnh cách lưu trữ dữ liệu và cập nhật theo nhu cầu cụ thể của ứng dụng của mình, ví dụ như sử dụng cơ sở dữ liệu nhúng (SQLite) hoặc các phương pháp lưu trữ dữ liệu khác phù hợp.
+
+cụ thể ví dụ tôi chọn model A có 5 test case thì nó sẽ hiện thị 5 test case đó còn 4 thì 4 cái đó tương tự v phụ thuộc vào ban đầu tôi cho model nào có bao nhiêu testcase
+ChatGPT
+Để cập nhật và hiển thị số lượng test case tương ứng với từng model khi người dùng chọn một model từ ProductDialog, bạn có thể sử dụng các đối tượng PyQt5 như QLabel hoặc QListWidget để hiển thị danh sách test case. Dưới đây là cách bạn có thể thực hiện điều này:
+
+python
+Copy code
+from PyQt5.QtWidgets import QDialog, QListWidget, QVBoxLayout, QListWidgetItem, QApplication, QPushButton, QWidget, QLabel, QHBoxLayout, QLineEdit
+from PyQt5.QtCore import pyqtSignal, QObject
+
+
+class ProductDialog(QDialog):
+    product_selected = pyqtSignal(str, int)
+
+    def __init__(self, products_data, parent=None):
+        super(ProductDialog, self).__init__(parent)
+
+        self.products_data = products_data
+
+        self.setWindowTitle("Select Product Model")
+
+        layout = QVBoxLayout(self)
+
+        self.list_widget = QListWidget()
+        self.list_widget.itemClicked.connect(self.on_item_clicked)
+
+        self.update_list_widget()
+
+        layout.addWidget(self.list_widget)
+
+    def update_list_widget(self):
+        self.list_widget.clear()
+        for product, test_cases in self.products_data.items():
+            item = QListWidgetItem(f"{product}: {test_cases} test cases")
+            self.list_widget.addItem(item)
+
+    def on_item_clicked(self, item):
+        # Example: Get selected item text
+        selected_text = item.text()
+        product_name, test_cases_str = selected_text.split(':')
+        test_cases = int(test_cases_str.split()[0])
+        self.product_selected.emit(product_name, test_cases)
+
+
+class MainWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.products_data = {}  # Initialize with an empty dictionary
+
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("Product Management")
+        layout = QVBoxLayout(self)
+
+        self.product_dialog = ProductDialog(self.products_data)
+        self.product_dialog.product_selected.connect(self.on_product_selected)
+
+        self.product_label = QLabel("Selected Product:")
+        self.product_name_label = QLabel("")
+        self.test_cases_label = QLabel("Test Cases:")
+        self.test_cases_list = QListWidget()
+
+        layout.addWidget(self.product_dialog)
+        layout.addWidget(self.product_label)
+        layout.addWidget(self.product_name_label)
+        layout.addWidget(self.test_cases_label)
+        layout.addWidget(self.test_cases_list)
+
+    def on_product_selected(self, product_name, test_cases):
+        # Example: Update UI with selected product and test cases
+        self.product_name_label.setText(product_name)
+        self.update_test_cases_list(test_cases)
+
+    def update_test_cases_list(self, num_test_cases):
+        self.test_cases_list.clear()
+        for i in range(1, num_test_cases + 1):
+            item = QListWidgetItem(f"Test Case {i}")
+            self.test_cases_list.addItem(item)
+
+
+if __name__ == '__main__':
+    import sys
+
+    app = QApplication(sys.argv)
+
+    main_widget = MainWidget()
+    main_widget.show()
+
+    # Example: Initially populate products_data with some values
+    main_widget.products_data = {
+        "Model A": 5,
+        "Model B": 4,
+        "Model C": 3
+    }
+
+    sys.exit(app.exec_())
+Giải thích ví dụ:
+ProductDialog hiển thị danh sách các model và số lượng test case tương ứng. Khi người dùng chọn một mục từ danh sách, sẽ phát ra tín hiệu product_selected chứa tên model và số lượng test case.
+MainWidget có các thành phần giao diện để hiển thị thông tin về sản phẩm đã chọn và danh sách các test case của sản phẩm đó.
+Khi người dùng chọn một model từ ProductDialog, phương thức on_product_selected được gọi để cập nhật giao diện hiển thị với tên model và danh sách test case tương ứng.
+Phương thức update_test_cases_list cập nhật QListWidget (test_cases_list) với số lượng test case tương ứng khi có sự thay đổi trong model được chọn.
+Bạn có thể điều chỉnh giao diện và logic xử lý phù hợp với yêu cầu cụ thể của ứng dụng của bạn, ví dụ như thêm các chức năng khác như lưu trữ, cập nhật dữ liệu sau mỗi lần thay đổi, và thay đổi giao diện tùy theo yêu cầu.
+
+        "Model A": 5,
+        "Model B": 4,
+        "Model C": 3 có một nút nhấn và nó sẽ hiện ra một popup mới lựa chọn model gì tương ứng với lượng testcase ra sao rồi lưu lại để giao diện chính quét qr có thễ xài tương ứng
+ChatGPT
+Để thực hiện tính năng này, bạn có thể thêm một nút nhấn trong MainWidget để mở một QDialog mới, cho phép người dùng chọn model và số lượng test case tương ứng. Sau đó, thông tin này sẽ được lưu lại và sử dụng khi quét mã QR để hiển thị số lượng test case tương ứng. Dưới đây là cách bạn có thể thực hiện:
+
+python
+Copy code
+from PyQt5.QtWidgets import QDialog, QListWidget, QVBoxLayout, QListWidgetItem, QApplication, QPushButton, QWidget, QLabel, QHBoxLayout, QLineEdit, QComboBox
+
+
+class ProductDialog(QDialog):
+    product_selected = pyqtSignal(str, int)
+
+    def __init__(self, parent=None):
+        super(ProductDialog, self).__init__(parent)
+
+        self.setWindowTitle("Select Product Model")
+
+        layout = QVBoxLayout(self)
+
+        self.model_combo = QComboBox()
+        self.model_combo.addItem("Model A")
+        self.model_combo.addItem("Model B")
+        self.model_combo.addItem("Model C")
+
+        self.test_case_edit = QLineEdit()
+        self.test_case_edit.setPlaceholderText("Enter number of test cases")
+
+        self.select_button = QPushButton("Select")
+        self.select_button.clicked.connect(self.on_select)
+
+        layout.addWidget(QLabel("Select Model:"))
+        layout.addWidget(self.model_combo)
+        layout.addWidget(QLabel("Number of Test Cases:"))
+        layout.addWidget(self.test_case_edit)
+        layout.addWidget(self.select_button)
+
+    def on_select(self):
+        model = self.model_combo.currentText()
+        test_cases_str = self.test_case_edit.text()
+
+        if test_cases_str:
+            try:
+                test_cases = int(test_cases_str)
+                self.product_selected.emit(model, test_cases)
+                self.accept()
+            except ValueError:
+                print("Invalid number of test cases entered.")
+        else:
+            print("Please enter number of test cases.")
+
+
+class MainWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.products_data = {
+            "Model A": 5,
+            "Model B": 4,
+            "Model C": 3
+        }
+
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("Product Management")
+        layout = QVBoxLayout(self)
+
+        self.product_dialog = ProductDialog()
+        self.product_dialog.product_selected.connect(self.on_product_selected)
+
+        self.select_model_button = QPushButton("Select Model")
+        self.select_model_button.clicked.connect(self.open_product_dialog)
+
+        self.product_label = QLabel("Selected Product:")
+        self.product_name_label = QLabel("")
+        self.test_cases_label = QLabel("Test Cases:")
+        self.test_cases_list = QListWidget()
+
+        layout.addWidget(self.select_model_button)
+        layout.addWidget(self.product_label)
+        layout.addWidget(self.product_name_label)
+        layout.addWidget(self.test_cases_label)
+        layout.addWidget(self.test_cases_list)
+
+    def open_product_dialog(self):
+        self.product_dialog.exec_()
+
+    def on_product_selected(self, model, test_cases):
+        self.products_data[model] = test_cases
+        self.update_ui()
+
+    def update_ui(self):
+        selected_model = self.product_dialog.model_combo.currentText()
+        self.product_name_label.setText(selected_model)
+        
+        self.test_cases_list.clear()
+        for i in range(1, self.products_data[selected_model] + 1):
+            item = QListWidgetItem(f"Test Case {i}")
+            self.test_cases_list.addItem(item)
+
+
+if __name__ == '__main__':
+    import sys
+    from PyQt5.QtWidgets import QApplication
+
+    app = QApplication(sys.argv)
+
+    main_widget = MainWidget()
+    main_widget.show()
+
+    sys.exit(app.exec_())
+Giải thích ví dụ:
+ProductDialog là một QDialog để người dùng có thể chọn model và nhập số lượng test case tương ứng.
+Trong MainWidget, select_model_button là một nút nhấn để mở ProductDialog.
+Khi người dùng chọn model và số lượng test case từ ProductDialog, sự kiện product_selected được phát ra và xử lý trong on_product_selected.
+Phương thức on_product_selected cập nhật dữ liệu trong products_data, sau đó gọi update_ui() để cập nhật giao diện chính.
+update_ui() cập nhật product_name_label và test_cases_list để hiển thị thông tin về model và các test case tương ứng.
+Bạn có thể điều chỉnh giao diện và logic xử lý để phù hợp với yêu cầu cụ thể của ứng dụng của bạn, ví dụ như thêm các kiểm tra hợp lệ hóa dữ liệu nhập vào, hoặc lưu trữ dữ liệu vào một định dạng lưu trữ như JSON như đã thảo luận trước đó.
